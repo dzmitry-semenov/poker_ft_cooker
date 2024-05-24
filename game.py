@@ -52,24 +52,21 @@ def flip_card_animation(card_back, card_front, pos, duration=0.5):
 def render_all():
     screen.fill((0, 128, 0))
 
-    # Render deck texture in the top-left corner
-    screen.blit(resized_back, (0, 0))
+    screen.blit(resized_back, (l/20, h/20))
 
-    # Render opponent cards
     for i, opponent_position in enumerate(opponent_positions):
         x, y = opponent_position
         for j in range(2):
-            if i == 0 or i == 2:  # Left and right opponents
+            if i == 0 or i == 2:
                 if j < len(opponent_cards_drawn[i]):
                     rotated_back = pygame.transform.rotate(resized_back, 90)
                     screen.blit(rotated_back, (x, y))
                 y += 0.1 * l
-            else:  # Top opponent
+            else:
                 if j < len(opponent_cards_drawn[i]):
                     screen.blit(resized_back, (x, y))
                 x += 0.1 * l
 
-    # Render center cards
     for i, center_position in enumerate(center_positions):
         x, y = center_position
         if i < len(played_cards_drawn):
@@ -77,14 +74,12 @@ def render_all():
         elif i < len(played_cards_drawn) + len(played_cards_face_down):
             screen.blit(resized_back, (x, y))
 
-    # Render player hand
     x = 0.4 * l
     y = 0.6 * h
     for card in hand_drawn:
         screen.blit(resized_card_images[card], (x, y))
         x += 0.1 * l
 
-    # Render buttons
     x = l / 15
     y = 0.85 * h
     for i in range(5):
@@ -162,69 +157,64 @@ while running:
     pygame.display.flip()
 
     if draw_sequence == 0:
-        # Draw one card for each player
         for i, opponent_position in enumerate(opponent_positions):
             x, y = opponent_position
             card = deck.pop()
             opponent_cards[i].append(card)
-            if i == 0 or i == 2:  # Left and right opponents
-                draw_card_animation(resized_back, (0, 0), (x, y))
+            if i == 0 or i == 2:
+                draw_card_animation(resized_back, (l/20, h/20), (x, y))
                 y += 0.1 * l
-            else:  # Top opponent
-                draw_card_animation(resized_back, (0, 0), (x, y))
+            else:
+                draw_card_animation(resized_back, (l/20, h/20), (x, y))
                 x += 0.1 * l
             opponent_cards_drawn[i].append(card)
         card = deck.pop()
         hand.append(card)
-        draw_card_animation(resized_card_images[card], (0, 0), (0.4 * l + (len(hand) - 1) * 0.1 * l, 0.6 * h))
+        draw_card_animation(resized_card_images[card], (l/20, h/20), (0.4 * l + (len(hand) - 1) * 0.1 * l, 0.6 * h))
         hand_drawn.append(card)
         draw_sequence += 1
 
     elif draw_sequence == 1:
-        # Draw one closed card in the center
         card = deck.pop()
         played_cards.append(card)
-        draw_card_animation(resized_back, (0, 0), center_positions[0])
+        draw_card_animation(resized_back, (l/20, h/20), center_positions[0])
         played_cards_face_down.append(card)
         draw_sequence += 1
 
     elif draw_sequence == 2:
-        # Draw the second card for each player
         for i, opponent_position in enumerate(opponent_positions):
             x, y = opponent_position
-            if i == 0 or i == 2:  # Left and right opponents
+            if i == 0 or i == 2:
                 y += 0.1 * l
-            else:  # Top opponent
+            else:
                 x += 0.1 * l
             card = deck.pop()
             opponent_cards[i].append(card)
-            if i == 0 or i == 2:  # Left and right opponents
-                draw_card_animation(resized_back, (0, 0), (x, y))
+            if i == 0 or i == 2:
+                draw_card_animation(resized_back, (l/20, h/20), (x, y))
                 y += 0.1 * l
-            else:  # Top opponent
-                draw_card_animation(resized_back, (0, 0), (x, y))
+            else:
+                draw_card_animation(resized_back, (l/20, h/20), (x, y))
                 x += 0.1 * l
             opponent_cards_drawn[i].append(card)
         card = deck.pop()
         hand.append(card)
-        draw_card_animation(resized_card_images[card], (0, 0), (0.4 * l + (len(hand) - 1) * 0.1 * l, 0.6 * h))
+        draw_card_animation(resized_card_images[card], (l/20, h/20), (0.4 * l + (len(hand) - 1) * 0.1 * l, 0.6 * h))
         hand_drawn.append(card)
         draw_sequence += 1
 
     elif draw_sequence == 3:
-        # Draw the second closed card in the center
         card = deck.pop()
         played_cards.append(card)
-        draw_card_animation(resized_back, (0, 0), center_positions[1])
+        draw_card_animation(resized_back, (l/20, h/20), center_positions[1])
         played_cards_face_down.append(card)
         draw_sequence += 1
 
     elif draw_sequence == 4:
-        # Draw the last three open cards in the center
         for i in range(2, 5):
             card = deck.pop()
             played_cards.append(card)
-            draw_card_animation(resized_card_images[card], (0, 0), center_positions[i])
+            draw_card_animation(resized_card_images[card], (l/20, h/20), center_positions[i])
             played_cards_drawn.append(card)
         draw_sequence += 1
 
