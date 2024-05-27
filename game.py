@@ -94,6 +94,9 @@ def render_all():
         button_rects.append(rect)
         x += resized_buttons[i].get_width() + 0.08 * l
 
+    render_text(f"Bank: ${full_bank}", (l - 200, 20), font_size=36, color=(255, 255, 255))
+    render_text(f"Last bet: ${current_bet}", (l - 200, 60), font_size=36, color=(255, 255, 255))
+
 
 def flip_center_cards():
     for i in range(2):
@@ -128,7 +131,7 @@ def animate_flip(position, back_image, front_image):
 def display_menu():
     start_button = pygame.image.load("textures/buttons/start.png")
     exit_button = pygame.image.load("textures/buttons/exit.png")
-    new_h = h/8
+    new_h = h / 8
     new_ls = start_button.get_width() / start_button.get_height() * new_height
     new_le = exit_button.get_width() / exit_button.get_height() * new_height
     start_button = resize_image(start_button, new_ls, new_h)
@@ -221,19 +224,22 @@ table = Table()
 
 betting_round = 0
 current_bet = 0
+full_bank = 0
 player_action = None
 raise_amount = 0
 input_active = False
 input_text = ""
-button_rects = []  # Initialize button_rects to store the rectangles of the buttons
+button_rects = []
 
 def handle_bet():
-    global current_bet, player_action
+    global current_bet, player_action, full_bank
     current_bet = 10  # Example blind amount
+    full_bank += current_bet
     player_action = "bet"
 
 def handle_call():
-    global player_action
+    global player_action, full_bank
+    full_bank += current_bet
     player_action = "call"
 
 def handle_check():
@@ -249,7 +255,7 @@ def handle_raise():
     input_active = True
 
 def process_player_action():
-    global current_bet, raise_amount, input_active, player_action
+    global current_bet, raise_amount, input_active, player_action, full_bank
     if player_action == "bet":
         players[0].balance -= current_bet
     elif player_action == "call":
@@ -261,6 +267,7 @@ def process_player_action():
     elif player_action == "raise":
         players[0].balance -= raise_amount
         current_bet = raise_amount
+        full_bank += raise_amount
 
     player_action = None
     input_active = False
@@ -336,14 +343,12 @@ while running:
     if player_action:
         process_player_action()
         if player_action == "fold":
-
             for i, opponent_position in enumerate(opponent_positions):
                 for card in players[i + 1].hand:
                     draw_card_animation(resized_card_images[card.get_image_index()], (l / 20, h / 20), opponent_position)
             winner, scores, winning_combination = play_round(players, table)
             print(f"Winner: {winner} with {winning_combination}")
             print("Scores:", scores)
-
             table.reset()
             for player in players:
                 player.reset_hand()
