@@ -2,7 +2,7 @@ import pygame
 import sys
 import tkinter as tk
 import time
-from gamelogic import Deck, Player, Table, play_round
+from gamelogic import Deck, Player, Table, play_round, play_game
 
 pygame.init()
 
@@ -12,9 +12,11 @@ h = root.winfo_screenheight()
 screen = pygame.display.set_mode((l, h))
 pygame.display.set_caption("Poker Game")
 
+
 def resize_image(original_image, new_width, new_height):
     resized_image = pygame.transform.scale(original_image, (new_width, new_height))
     return resized_image
+
 
 def draw_card_animation(card_image, start_pos, end_pos, duration=0.5):
     start_time = time.time()
@@ -27,6 +29,7 @@ def draw_card_animation(card_image, start_pos, end_pos, duration=0.5):
         pygame.display.flip()
         pygame.time.delay(10)
 
+
 def flip_card_animation(card_back, card_front, pos, duration=0.5):
     start_time = time.time()
     while time.time() - start_time < duration:
@@ -36,17 +39,25 @@ def flip_card_animation(card_back, card_front, pos, duration=0.5):
             card_image = pygame.transform.scale(card_back, (int(card_back.get_width() * scale), card_back.get_height()))
         else:
             scale = 1 - 2 * abs(t - 0.75)
-            card_image = pygame.transform.scale(card_front, (int(card_front.get_width() * scale), card_front.get_height()))
+            card_image = pygame.transform.scale(card_front,
+                                                (int(card_front.get_width() * scale), card_front.get_height()))
         screen.fill((0, 128, 0))
         render_all()
         screen.blit(card_image, (pos[0] + (card_back.get_width() - card_image.get_width()) // 2, pos[1]))
         pygame.display.flip()
         pygame.time.delay(10)
 
+
+def render_text(text, position, font_size=24, color=(255, 255, 255)):
+    font = pygame.font.Font(None, font_size)
+    text_surface = font.render(text, True, color)
+    screen.blit(text_surface, position)
+
+
 def render_all():
     screen.fill((0, 128, 0))
-    screen.blit(resized_back, (l/20, h/20))
-    for i, opponent_position in enumerate(opponent_positions):
+    screen.blit(resized_back, (l / 20, h / 20))
+    for i, (opponent_position, player) in enumerate(zip(opponent_positions, players[1:])):
         x, y = opponent_position
         for j in range(2):
             if i == 0 or i == 2:
@@ -58,6 +69,7 @@ def render_all():
                 if j < len(opponent_cards_drawn[i]):
                     screen.blit(resized_back, (x, y))
                 x += 0.1 * l
+        render_text(f"{player.name}: ${player.balance}", (opponent_position[0], opponent_position[1] - 30))
 
     for i, center_position in enumerate(center_positions):
         x, y = center_position
@@ -72,11 +84,14 @@ def render_all():
         screen.blit(resized_card_images[card.get_image_index()], (x, y))
         x += 0.1 * l
 
+    render_text(f"{players[0].name}: ${players[0].balance}", (0.4 * l, 0.6 * h - 30))
+
     x = l / 15
     y = 0.85 * h
     for i in range(5):
         screen.blit(resized_buttons[i], (x, y))
         x += resized_buttons[i].get_width() + 0.08 * l
+
 
 def flip_center_cards():
     for i in range(2):
@@ -106,6 +121,56 @@ def animate_flip(position, back_image, front_image):
         render_all()
         pygame.display.flip()
         time.sleep(0.05)
+
+
+def display_menu():
+    start_button = pygame.image.load("textures/buttons/start.png")
+    exit_button = pygame.image.load("textures/buttons/exit.png")
+    new_h = h/8
+    new_ls = start_button.get_width() / start_button.get_height() * new_height
+    new_le = exit_button.get_width() / exit_button.get_height() * new_height
+    start_button = resize_image(start_button, new_ls, new_h)
+    exit_button = resize_image(exit_button, new_le, new_h)
+
+    nickname = ""
+    input_active = False
+
+    while True:
+        screen.fill((0, 128, 0))
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                mouse_x, mouse_y = event.pos
+                if start_button_rect.collidepoint(mouse_x, mouse_y):
+                    return nickname
+                elif exit_button_rect.collidepoint(mouse_x, mouse_y):
+                    pygame.quit()
+                    sys.exit()
+                elif input_box.collidepoint(mouse_x, mouse_y):
+                    input_active = True
+                else:
+                    input_active = False
+            elif event.type == pygame.KEYDOWN:
+                if input_active:
+                    if event.key == pygame.K_RETURN:
+                        input_active = False
+                    elif event.key == pygame.K_BACKSPACE:
+                        nickname = nickname[:-1]
+                    else:
+                        nickname += event.unicode
+
+        start_button_rect = screen.blit(start_button, (l / 2 - start_button.get_width() / 2, h / 3))
+        exit_button_rect = screen.blit(exit_button, (l / 2 - exit_button.get_width() / 2, h / 2))
+        input_box = pygame.Rect(l / 2 - l / 8, h / 1.5, l / 4, h / 16)
+
+        pygame.draw.rect(screen, (255, 255, 255), input_box, 2)
+        render_text(nickname, (input_box.x + 10, input_box.y + 5), font_size=36, color=(255, 255, 255))
+
+        pygame.display.flip()
+
 
 resized_card_images = []
 new_width = l / 12
@@ -138,7 +203,8 @@ for i in range(5):
 hand = []
 hand_drawn = []
 
-center_positions = [(0.25 * l, 0.325 * h), (0.35 * l, 0.325 * h), (0.45 * l, 0.325 * h), (0.55 * l, 0.325 * h), (0.65 * l, 0.325 * h)]
+center_positions = [(0.25 * l, 0.325 * h), (0.35 * l, 0.325 * h), (0.45 * l, 0.325 * h), (0.55 * l, 0.325 * h),
+                    (0.65 * l, 0.325 * h)]
 played_cards = []
 played_cards_drawn = []
 played_cards_face_down = []
@@ -147,7 +213,9 @@ opponent_positions = [(0.02 * l, 0.325 * h), (0.4 * l, 0.05 * h), (0.79 * l, 0.3
 opponent_cards = [[], [], []]
 opponent_cards_drawn = [[], [], []]
 
-players = [Player("Player1", 1000), Player("Opponent1", 1000), Player("Opponent2", 1000), Player("Opponent3", 1000)]
+nickname = display_menu()
+
+players = [Player(nickname, 1000), Player("Opponent1", 1000), Player("Opponent2", 1000), Player("Opponent3", 1000)]
 table = Table()
 
 running = True
@@ -196,3 +264,5 @@ while running:
         draw_sequence += 1
 
 pygame.quit()
+
+play_game(players, table)

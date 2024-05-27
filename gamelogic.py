@@ -97,3 +97,17 @@ def play_round(players, table):
     winning_combination = combinations[winner]
 
     return winner, scores, winning_combination
+
+
+def play_game(players, table):
+    while True:
+        winner, scores, winning_combination = play_round(players, table)
+        print(f"Winner: {winner} with {winning_combination}")
+        print("Scores:", scores)
+
+        # Update player balances or any other game state updates here
+
+        # Ask if the user wants to play another round
+        response = input("Do you want to play another round? (yes/no): ").strip().lower()
+        if response != 'yes':
+            break
