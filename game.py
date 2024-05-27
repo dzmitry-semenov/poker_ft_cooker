@@ -88,8 +88,10 @@ def render_all():
 
     x = l / 15
     y = 0.85 * h
+    button_rects.clear()
     for i in range(5):
-        screen.blit(resized_buttons[i], (x, y))
+        rect = screen.blit(resized_buttons[i], (x, y))
+        button_rects.append(rect)
         x += resized_buttons[i].get_width() + 0.08 * l
 
 
@@ -203,8 +205,7 @@ for i in range(5):
 hand = []
 hand_drawn = []
 
-center_positions = [(0.25 * l, 0.325 * h), (0.35 * l, 0.325 * h), (0.45 * l, 0.325 * h), (0.55 * l, 0.325 * h),
-                    (0.65 * l, 0.325 * h)]
+center_positions = [(0.25 * l, 0.325 * h), (0.35 * l, 0.325 * h), (0.45 * l, 0.325 * h), (0.55 * l, 0.325 * h), (0.65 * l, 0.325 * h)]
 played_cards = []
 played_cards_drawn = []
 played_cards_face_down = []
@@ -218,6 +219,52 @@ nickname = display_menu()
 players = [Player(nickname, 1000), Player("Opponent1", 1000), Player("Opponent2", 1000), Player("Opponent3", 1000)]
 table = Table()
 
+betting_round = 0
+current_bet = 0
+player_action = None
+raise_amount = 0
+input_active = False
+input_text = ""
+button_rects = []  # Initialize button_rects to store the rectangles of the buttons
+
+def handle_bet():
+    global current_bet, player_action
+    current_bet = 10  # Example blind amount
+    player_action = "bet"
+
+def handle_call():
+    global player_action
+    player_action = "call"
+
+def handle_check():
+    global player_action
+    player_action = "check"
+
+def handle_fold():
+    global player_action
+    player_action = "fold"
+
+def handle_raise():
+    global input_active
+    input_active = True
+
+def process_player_action():
+    global current_bet, raise_amount, input_active, player_action
+    if player_action == "bet":
+        players[0].balance -= current_bet
+    elif player_action == "call":
+        players[0].balance -= current_bet
+    elif player_action == "check":
+        pass
+    elif player_action == "fold":
+        pass
+    elif player_action == "raise":
+        players[0].balance -= raise_amount
+        current_bet = raise_amount
+
+    player_action = None
+    input_active = False
+
 running = True
 draw_sequence = 0
 num_cards_per_player = 2
@@ -226,6 +273,29 @@ while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+            mouse_x, mouse_y = event.pos
+            for i, button_rect in enumerate(button_rects):
+                if button_rect.collidepoint(mouse_x, mouse_y):
+                    if i == 0:
+                        handle_bet()
+                    elif i == 1:
+                        handle_call()
+                    elif i == 2:
+                        handle_check()
+                    elif i == 3:
+                        handle_fold()
+                    elif i == 4:
+                        handle_raise()
+        elif event.type == pygame.KEYDOWN and input_active:
+            if event.key == pygame.K_RETURN:
+                raise_amount = int(input_text)
+                process_player_action()
+                input_text = ""
+            elif event.key == pygame.K_BACKSPACE:
+                input_text = input_text[:-1]
+            else:
+                input_text += event.unicode
 
     if not running:
         break
@@ -263,6 +333,21 @@ while running:
         flip_center_cards()
         draw_sequence += 1
 
-pygame.quit()
+    if player_action:
+        process_player_action()
+        if player_action == "fold":
 
-play_game(players, table)
+            for i, opponent_position in enumerate(opponent_positions):
+                for card in players[i + 1].hand:
+                    draw_card_animation(resized_card_images[card.get_image_index()], (l / 20, h / 20), opponent_position)
+            winner, scores, winning_combination = play_round(players, table)
+            print(f"Winner: {winner} with {winning_combination}")
+            print("Scores:", scores)
+
+            table.reset()
+            for player in players:
+                player.reset_hand()
+            draw_sequence = 0
+            player_action = None
+
+pygame.quit()
