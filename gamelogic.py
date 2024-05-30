@@ -105,9 +105,6 @@ def play_game(players, table):
         print(f"Winner: {winner} with {winning_combination}")
         print("Scores:", scores)
 
-        # Update player balances or any other game state updates here
-
-        # Ask if the user wants to play another round
         response = input("Do you want to play another round? (yes/no): ").strip().lower()
         if response != 'yes':
             break
