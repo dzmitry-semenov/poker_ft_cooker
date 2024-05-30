@@ -21,6 +21,8 @@ class Deck:
     def __init__(self):
         self.cards = [Card(suit, value) for suit in Card.suits for value in Card.values]
         random.shuffle(self.cards)
+        self.draw_center_card = self.cards[:5]
+        self.cards = self.cards[5:]
 
     def draw(self):
         return self.cards.pop()
@@ -31,6 +33,7 @@ class Player:
         self.name = name
         self.balance = balance
         self.hand = []
+        self.in_game = True
 
     def reset_hand(self):
         self.hand = []
@@ -62,38 +65,60 @@ def calculate_score(hand):
 def check_combination(hand):
     values = [card.value for card in hand]
     suits = [card.suit for card in hand]
-    if len(set(values)) == 2:
-        if values.count(values[0]) == 4 or values.count(values[1]) == 4:
-            return "Four of a Kind"
-        else:
-            return "Full House"
     if len(set(suits)) == 1:
-        return "Flush"
-    if sorted(values) == list(range(min(values), max(values) + 1)):
-        return "Straight"
-    if len(set(values)) == 3:
-        return "Three of a Kind"
-    if len(set(values)) == 4:
-        return "Two Pair"
-    if len(set(values)) == 5:
-        return "One Pair"
-    return "High Card"
+        if sorted(values) == list(range(10, 15)):
+            return 1000, "Royal Flush"
+        elif len(set(values)) == 5 and sorted(values)[4] - sorted(values)[0] == 4:
+            return 900, "Straight Flush"
+        else:
+            return 600, "Flush"
+    elif len(set(values)) == 2:
+        if values.count(values[0]) == 4 or values.count(values[1]) == 4:
+            return 800, "Four of a Kind"
+        else:
+            return 700, "Full House"
+    elif sorted(values) == list(range(min(values), max(values) + 1)):
+        return 500, "Straight"
+    elif len(set(values)) == 3:
+        return 400, "Three of a Kind"
+    elif len(set(values)) == 4:
+        return 300, "Two Pair"
+    elif len(set(values)) == 5:
+        return 200, "One Pair"
+    else:
+        return 100, "High Card"
 
 
 def play_round(players, table):
     table.reset()
     for player in players:
         player.reset_hand()
+        player.in_game = True
         for _ in range(2):
             player.add_card(table.deck.draw())
 
     for _ in range(3):
         table.draw_center_card()
 
-    scores = {player.name: calculate_score(player.hand + table.center_cards) for player in players}
-    combinations = {player.name: check_combination(player.hand + table.center_cards) for player in players}
+    scores = {player.name: calculate_score(player.hand + table.center_cards) for player in players if player.in_game}
+    combination_ranks = {}
+    combinations = {}
 
-    winner = max(scores, key=scores.get)
+    for player in players:
+        if player.in_game:
+            rank, combination = check_combination(player.hand + table.center_cards)
+            combination_ranks[player.name] = rank
+            combinations[player.name] = combination
+
+    max_combination_rank = max(combination_ranks.values())
+    winners = [player for player, rank in combination_ranks.items() if rank == max_combination_rank]
+
+
+    if len(winners) == 1:
+        winner = winners[0]
+    else:
+        winner = winners[0]
+
     winning_combination = combinations[winner]
 
     return winner, scores, winning_combination
