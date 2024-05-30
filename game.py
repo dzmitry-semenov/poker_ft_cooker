@@ -48,7 +48,7 @@ def flip_card_animation(card_back, card_front, pos, duration=0.5):
         pygame.time.delay(10)
 
 
-def render_text(text, position, font_size=24, color=(255, 255, 255)):
+def render_text(text, position, font_size=32, color=(255, 255, 255)):
     font = pygame.font.Font(None, font_size)
     text_surface = font.render(text, True, color)
     screen.blit(text_surface, position)
@@ -94,8 +94,8 @@ def render_all():
         button_rects.append(rect)
         x += resized_buttons[i].get_width() + 0.08 * l
 
-    render_text(f"Bank: ${full_bank}", (l - 200, 20), font_size=36, color=(255, 255, 255))
-    render_text(f"Last bet: ${current_bet}", (l - 200, 60), font_size=36, color=(255, 255, 255))
+    render_text(f"Bank: ${full_bank}", (0.8*l, 0.05*h), font_size=52, color=(255, 255, 255))
+    render_text(f"Last bet: ${current_bet}", (0.8*l, 0.1*h), font_size=52, color=(255, 255, 255))
 
 
 def flip_center_cards():
@@ -171,8 +171,8 @@ def display_menu():
         exit_button_rect = screen.blit(exit_button, (l / 2 - exit_button.get_width() / 2, h / 2))
         input_box = pygame.Rect(l / 2 - l / 8, h / 1.5, l / 4, h / 16)
 
-        pygame.draw.rect(screen, (255, 255, 255), input_box, 2)
-        render_text(nickname, (input_box.x + 10, input_box.y + 5), font_size=36, color=(255, 255, 255))
+        pygame.draw.rect(screen, (255, 255, 255), input_box, 3)
+        render_text(nickname, (input_box.x + 10, input_box.y + 4), font_size=64, color=(255, 255, 255))
 
         pygame.display.flip()
 
