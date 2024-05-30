@@ -1,6 +1,43 @@
+from pydantic import BaseModel
+from typing import List
 import httpx
 import requests
 import time
+import random
+
+class Card:
+    suit_to_index = {'H': 0, 'D': 1, 'C': 2, 'S': 3}
+    suits = ['H', 'D', 'C', 'S']
+    values = list(range(2, 15))
+
+    def __init__(self, suit: str, value: int):
+        self.suit = suit
+        self.value = value
+
+    def __lt__(self, other):
+        return self.value < other.value
+
+    def get_image_index(self):
+        return (self.value - 2) + Card.suit_to_index[self.suit] * 13
+
+class Player(BaseModel):
+    id: int
+    name: str
+    score: int = 1000
+    turn: bool = False
+    action: str = 'none'
+    bet: int = 0
+    hand: List[Card] = []
+
+class Deck:
+    def __init__(self):
+        self.cards = [Card(suit, value) for suit in Card.suits for value in Card.values]
+        random.shuffle(self.cards)
+        self.draw_center_card = self.cards[:5]
+        self.cards = self.cards[5:]
+
+    def draw(self):
+        return self.cards.pop()
 
 class PokerClient:
 
@@ -16,43 +53,33 @@ class PokerClient:
         response = httpx.get(f"{self.server_url}/players/")
         return response.json()
 
+    def get_deck(self):
+        response = httpx.get(f"{self.server_url}/Deck/")
+        return response.json()
 
     #Что-то для возможностей игрока 
-    def bet(self, player_id, username, balance):
-        response = httpx.put(f"{self.server_url}/players/{player_id}", json={"username": username, "balance": balance})
-        return response.json()
-    
-    def call(self, player_id, username, balance):
-        response = httpx.put(f"{self.server_url}/players/{player_id}", json={"username": username, "balance": balance})
-        return response.json()
-    
-    def check(self, player_id, username, balance):
-        response = httpx.put(f"{self.server_url}/players/{player_id}", json={"username": username, "balance": balance})
-        return response.json()
-    
-    def fold(self, player_id, username, balance):
-        response = httpx.put(f"{self.server_url}/players/{player_id}", json={"username": username, "balance": balance})
-        return response.json()
-    
-    def raisee(self, player_id, username, balance):
-        response = httpx.put(f"{self.server_url}/players/{player_id}", json={"username": username, "balance": balance})
+    def action(self, player_id):
+        action_payload = {
+            "action": "raise",
+            "amount": 50
+        }
+        response = httpx.post(f"{self.server_url}/players/{player_id}/action/", json=action_payload)
         return response.json()
 
+    def check_turn(self, player_id):
+        try:
+            players = self.get_players()
+            if players[player_id].turn:
+                return True
+            return False
+        except Exception as e:
+            print(f"Error: {e}")
 
     #Чтобы было
     def delete_player(self, player_id):
         response = httpx.delete(f"{self.server_url}/players/{player_id}")
         return response.json()
 
-def check_turn(player_id):
-    try:
-        response = requests.get(f'http://127.0.0.1:8000/turn/{player_id}')
-        data = response.json()
-        if data['message'] == "Your turn":
-            return True
-        return False
-    except Exception as e:
-        print(f"Error: {e}")
 
 # Пример использования клиента
 server_url = "http://127.0.0.1:8000"
@@ -60,8 +87,4 @@ client = PokerClient(server_url)
 my_balance = 1000
 # Создаем игрока
 player_id = client.create_player("dtepanchez", my_balance)
-
-while True:
-    if check_turn(player_id):
-        break
-    time.sleep(5)  # Добавляем задержку перед следующим запросом, чтобы снизить нагрузку на сервер
+deck = client.get_deck()

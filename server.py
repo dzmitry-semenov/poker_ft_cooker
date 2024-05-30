@@ -31,6 +31,7 @@ class Player(BaseModel):
     name: str
     score: int = 1000
     turn: bool = False
+    action: str = 'none'
     bet: int = 0
     hand: List[Card] = []
 
@@ -46,27 +47,62 @@ class Deck:
 
 players: List[Player] = []
 deck = Deck()
+bank = 0
 
+
+def calculate_score(hand):
+    score = sum(card.value for card in hand)
+    return score
 
 def check_combination(hand):
     values = [card.value for card in hand]
     suits = [card.suit for card in hand]
-    if len(set(values)) == 2:
-        if values.count(values[0]) == 4 or values.count(values[1]) == 4:
-            return "Four of a Kind"
-        else:
-            return "Full House"
     if len(set(suits)) == 1:
-        return "Flush"
-    if sorted(values) == list(range(min(values), max(values) + 1)):
-        return "Straight"
-    if len(set(values)) == 3:
-        return "Three of a Kind"
-    if len(set(values)) == 4:
-        return "Two Pair"
-    if len(set(values)) == 5:
-        return "One Pair"
-    return "High Card"
+        if sorted(values) == list(range(10, 15)):
+            return 1000, "Royal Flush"
+        elif len(set(values)) == 5 and sorted(values)[4] - sorted(values)[0] == 4:
+            return 900, "Straight Flush"
+        else:
+            return 600, "Flush"
+    elif len(set(values)) == 2:
+        if values.count(values[0]) == 4 or values.count(values[1]) == 4:
+            return 800, "Four of a Kind"
+        else:
+            return 700, "Full House"
+    elif sorted(values) == list(range(min(values), max(values) + 1)):
+        return 500, "Straight"
+    elif len(set(values)) == 3:
+        return 400, "Three of a Kind"
+    elif len(set(values)) == 4:
+        return 300, "Two Pair"
+    elif len(set(values)) == 5:
+        return 200, "One Pair"
+    else:
+        return 100, "High Card"
+
+
+def find_winner():
+    global players, deck
+    scores = {player.name: calculate_score(player.hand + deck.center_cards) for player in players if player.in_game}
+    combination_ranks = {}
+    combinations = {}
+
+    for player in players:
+        if player.in_game:
+            rank, combination = check_combination(player.hand + deck.center_cards)
+            combination_ranks[player.name] = rank
+            combinations[player.name] = combination
+
+    max_combination_rank = max(combination_ranks.values())
+    winners = [player for player, rank in combination_ranks.items() if rank == max_combination_rank]
+
+
+    if len(winners) != 1:
+        max_score = max(scores[player] for player in winners)
+        winners = [player for player in winners if scores[player] == max_score]
+
+    return winners
+
 
 
 # Инициализация FastAPI
@@ -78,6 +114,14 @@ async def create_player(player_in: PlayerIn):
     players.append(Player(id = len(players), name=player_in.name, score=player_in.score))
     return len(players)-1
 
+class Action(BaseModel):
+    action: str
+    amount: int
+
+@app.post("/players/{player_id}/action")
+async def action(player_id: int, action: Action):
+    global players
+    players[player_id].action = action.action
 
 @app.get("/players/", response_model=List[Player])
 async def read_players():
@@ -89,51 +133,45 @@ async def read_deck():
     global deck
     return deck
 
+
 async def deal_cards_to_players():
     global players
     for player in players:
         # Раздаем каждому игроку по две карты
         player(hand = [deck.draw(), deck.draw()])
 
-class GameState:
-    def __init__(self):
-        self.current_bet = 0
-        self.pot = 0
-        self.stage = 0  # 0 for preflop, 1 for flop, etc.
 
-    def reset_for_next_round(self):
-        self.current_bet = 0
-        self.pot = 0
-        self.stage = 0
-
-game_state = GameState()
-
-async def betting_round(start_player: int):
-    global players, game_state
+async def betting_round(start_player: int, a=[1, 1, 1, 1], marker_raise = 0):
+    global players
     
     num_players = len(players)
     player_turn = start_player
     betting_continues = True
-    
-    while betting_continues:
+    while betting_continues and sum(a) > 1:
         player = players[player_turn]
-        if player.score > 0:
-            print(f"Player {player.name}'s turn to bet.")
-            # Here, you would prompt player to make their move: fold, call, raise.
-            # This is simplified; in a real scenario, you would handle player input asynchronously.
-            
-            # Example bet (this part should be replaced with actual player interaction):
-            bet = min(100, player.score)  # Just an example bet to keep things moving
-            player_score -= bet
-            game_state.pot += bet
-            
-            # If player raises, you should reset the counter for how many players need to match the bet
-            
+        if player.score > 0 and a[player_turn]:
+            player.turn = True
+            while player.action == 'none':
+                time.sleep(0.5)
+                continue
+            player.turn = False
+            curent_action = players[player_turn]
+            if curent_action.action == 'fold':
+                a[player_turn] = 0
+                players[player_turn].hand = []
+            elif curent_action.action != 'check':
+                players[player_turn].score -= curent_action.amount
+                players[player_turn].bet += curent_action.amount
+                bank += curent_action.amount
+                if curent_action.action == 'raisee':
+                    betting_round(player_turn+1, a, 1)
+        if (player_turn - start_player)%4 == (sum(a)-marker_raise)%4:
+            b = set([a[i]*players[i].bet for i in range(4)])
+            b.remove(0)
+            betting_continues = (len(b) != 1)
         player_turn = (player_turn + 1) % num_players
-        betting_continues = False  # For our simplified example, we'll stop after one loop. In practice, you continue until all bets are matched.
 
-
-
+    
 
 @app.delete("/players/{player_id}/", response_model=Player)
 async def delete_player(player_id: int):
@@ -153,6 +191,14 @@ if __name__ == "__main__":
     for _ in range(4):
         deck = Deck() 
         deal_cards_to_players()
-        betting_round(start_player=0)
+        for _ in range(3):
+            betting_round(start_player=0)
+        for winner in find_winner():
+            players[winner].score += bank/len(find_winner())
+        for player in players:
+            player.bet = 0
+            player.hand = []
+            player.action = ''
+            player.turn = False
 
     uvicorn.run(app, host="127.0.0.5", port=8000)
