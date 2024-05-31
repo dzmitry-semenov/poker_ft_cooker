@@ -18,9 +18,12 @@ class Card:
 
 
 class Deck:
-    def __init__(self):
-        self.cards = [Card(suit, value) for suit in Card.suits for value in Card.values]
-        random.shuffle(self.cards)
+    def __init__(self, deck_data=None):
+        if deck_data:
+            self.cards = [Card(card['suit'], card['value']) for card in deck_data]
+        else:
+            self.cards = [Card(suit, value) for suit in Card.suits for value in Card.values]
+            random.shuffle(self.cards)
         self.draw_center_card = self.cards[:5]
         self.cards = self.cards[5:]
 
@@ -43,9 +46,9 @@ class Player:
 
 
 class Table:
-    def __init__(self):
+    def __init__(self, deck_data):
         self.center_cards = []
-        self.deck = Deck()
+        self.deck = Deck(deck_data)
 
     def reset(self):
         self.center_cards = []

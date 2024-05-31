@@ -14,7 +14,7 @@ l = root.winfo_screenwidth()
 h = root.winfo_screenheight()
 screen = pygame.display.set_mode((l, h))
 pygame.display.set_caption("Poker Game")
-input_box = pygame.Rect(0, 0, 0, 0)
+input_box = pygame.Rect(l / 2 - l / 8, h / 1.5, l / 4, h / 16)
 
 
 class PokerClient:
@@ -32,41 +32,42 @@ class PokerClient:
         return response.json()
 
     # Что-то для возможностей игрока
-    def bet(self, player_id, username, balance):
-        response = httpx.put(f"{self.server_url}/players/{player_id}", json={"username": username, "balance": balance})
+    def action(self, player_id, action, amount):
+        action_payload = {
+            "action": action,
+            "amount": amount
+        }
+        response = httpx.post(f"{self.server_url}/players/{player_id}/action/", json=action_payload)
         return response.json()
 
-    def call(self, player_id, username, balance):
-        response = httpx.put(f"{self.server_url}/players/{player_id}", json={"username": username, "balance": balance})
-        return response.json()
+    def bet(self, player_id, amount):
+        return self.action(player_id, 'bet', amount)
 
-    def check(self, player_id, username, balance):
-        response = httpx.put(f"{self.server_url}/players/{player_id}", json={"username": username, "balance": balance})
-        return response.json()
+    def call(self, player_id, amount):
+        return self.action(player_id, 'call', amount)
 
-    def fold(self, player_id, username, balance):
-        response = httpx.put(f"{self.server_url}/players/{player_id}", json={"username": username, "balance": balance})
-        return response.json()
+    def check(self, player_id, amount):
+        return self.action(player_id, 'check', 0)
 
-    def raisee(self, player_id, username, balance, raise_amount):
-        response = httpx.put(f"{self.server_url}/players/{player_id}", json={"username": username, "balance": balance + raise_amount})
-        return response.json()
+    def fold(self, player_id):
+        return self.action(player_id, 'fold', 0)
+
+    def raisee(self, player_id, amount):
+        return self.action(player_id, 'raisee', amount)
 
     # Чтобы было
     def delete_player(self, player_id):
         response = httpx.delete(f"{self.server_url}/players/{player_id}")
         return response.json()
 
-
-def check_turn(player_id):
-    try:
-        response = requests.get(f'http://127.0.0.1:8000/turn/{player_id}')
-        data = response.json()
-        if data['message'] == "Your turn":
-            return True
-        return False
-    except Exception as e:
-        print(f"Error: {e}")
+    def check_turn(self, player_id):
+        try:
+            players = self.get_players()
+            if players[player_id].turn:
+                return True
+            return False
+        except Exception as e:
+            print(f"Error: {e}")
 
 def resize_image(original_image, new_width, new_height):
     resized_image = pygame.transform.scale(original_image, (new_width, new_height))
@@ -124,7 +125,7 @@ def render_all():
                 if j < len(opponent_cards_drawn[i]):
                     screen.blit(resized_back, (x, y))
                 x += 0.1 * l
-        render_text(f"{player.name}: ${player.balance}", (opponent_position[0], opponent_position[1] - 30))
+        render_text(f"{player['name']}: ${player['score']}", (opponent_position[0], opponent_position[1] - 30))
 
     for i, center_position in enumerate(center_positions):
         x, y = center_position
@@ -139,7 +140,7 @@ def render_all():
         screen.blit(resized_card_images[card.get_image_index()], (x, y))
         x += 0.1 * l
 
-    render_text(f"{players[0].name}: ${players[0].balance}", (0.4 * l, 0.6 * h - 30))
+    render_text(f"{players[0]['name']}: ${players[0]['score']}", (0.4 * l, 0.6 * h - 30))
 
     x = l / 15
     y = 0.85 * h
@@ -149,8 +150,8 @@ def render_all():
         button_rects.append(rect)
         x += resized_buttons[i].get_width() + 0.08 * l
 
-    render_text(f"Bank: ${full_bank}", (0.8*l, 0.05*h), font_size=52, color=(255, 255, 255))
-    render_text(f"Last bet: ${current_bet}", (0.8*l, 0.1*h), font_size=52, color=(255, 255, 255))
+    render_text(f"Bank: ${full_bank}", (0.8 * l, 0.05 * h), font_size=52, color=(255, 255, 255))
+    render_text(f"Last bet: ${current_bet}", (0.8 * l, 0.1 * h), font_size=52, color=(255, 255, 255))
 
     if input_active:
         pygame.draw.rect(screen, (255, 255, 255), input_box, 2)
@@ -199,6 +200,7 @@ def display_menu():
     exit_button = resize_image(exit_button, new_le, new_h)
     global input_box
     input_box = pygame.Rect(l / 2 - l / 8, h / 1.5, l / 4, h / 16)
+
 
     nickname = ""
     input_active = False
@@ -281,8 +283,17 @@ opponent_cards_drawn = [[], [], []]
 
 nickname = display_menu()
 
-players = [Player(nickname, 1000), Player("Opponent1", 1000), Player("Opponent2", 1000), Player("Opponent3", 1000)]
-table = Table()
+server_url = "http://127.0.0.1:8000"
+client = PokerClient(server_url)
+my_balance = 1000
+# Создаем игрока
+player_id = client.create_player(nickname, my_balance)
+deck = client.get_deck()
+
+players_data = client.get_players()
+players = [Player(player['name'], player['score']) for player in players_data]
+deck_data = client.get_deck()
+table = Table(deck_data)
 
 betting_round = 0
 current_bet = 0
@@ -293,26 +304,20 @@ input_active = False
 input_text = ""
 button_rects = []
 
-server_url = "http://127.0.0.1:8000"
-client = PokerClient(server_url)
-my_balance = 1000
-# Создаем игрока
-player_id = client.create_player("dtepanchez", my_balance)
-
 while True:
-    if check_turn(player_id):
+    if client.check_turn(player_id):
         break
     time.sleep(5)
 
-def handle_bet():
+def handle_bet(amount):
     global currentPlayerBet, player_action, input_active
-    currentPlayerBet = bet(player_id, players[0].name, players[0].balance)
+    currentPlayerBet = client.bet(player_id, amount)
     player_action = "bet"
     input_active = True
 
-def handle_call():
+def handle_call(amount):
     global player_action, full_bank
-    full_bank += call(player_id, players[0].name, players[0].balance)
+    full_bank += client.call(player_id, amount)
     player_action = "call"
 
 def handle_check():
@@ -375,7 +380,7 @@ def process_player_action():
     player_action = None
     input_active = False
 
-running = True
+runningrunning = True
 draw_sequence = 0
 num_cards_per_player = 2
 
@@ -388,9 +393,9 @@ while running:
             for i, button_rect in enumerate(button_rects):
                 if button_rect.collidepoint(mouse_x, mouse_y):
                     if i == 0:
-                        handle_bet()
+                        handle_bet(current_bet)
                     elif i == 1:
-                        handle_call()
+                        handle_call(current_bet)
                     elif i == 2:
                         handle_check()
                     elif i == 3:
@@ -400,10 +405,10 @@ while running:
         elif event.type == pygame.KEYDOWN:
             if input_active:
                 if event.key == K_RETURN:
-                    raise_amount = int(input_text)  # получаем значение увеличения из поля ввода
-                    currentPlayerBet += raise_amount
-                    raisee(player_id, players[0].name, players[0].balance + raise_amount)  # обновляем баланс сервера
-                    process_player_action()  # процессинг операции
+                    raise_amount = int(input_text)
+                    current_bet += raise_amount
+                    client.raisee(player_id, raise_amount)
+                    process_player_action()
                     input_text = ""
                     input_active = False
                 elif event.key == K_BACKSPACE:
@@ -414,6 +419,10 @@ while running:
     if not running:
         break
 
+    # Fetch the latest game state from the server
+    players = client.get_players()
+    deck = client.get_deck()
+
     screen.fill((0, 128, 0))
     render_all()
     pygame.display.flip()
@@ -421,8 +430,8 @@ while running:
     if draw_sequence < num_cards_per_player:
         for i, opponent_position in enumerate(opponent_positions):
             x, y = opponent_position
-            card = Deck.deck.draw()
-            players[i + 1].add_card(card)
+            card = deck.draw()
+            players[i + 1]['hand'].append(card)
             if i == 0 or i == 2:
                 draw_card_animation(resized_back, (l / 20, h / 20), (x, y))
                 y += 0.1 * l
@@ -431,10 +440,10 @@ while running:
                 x += 0.1 * l
             opponent_cards_drawn[i].append(card)
 
-        card = Deck.deck.draw()
-        players[0].add_card(card)
+        card = deck.draw()
+        players[0]['hand'].append(card)
         draw_card_animation(resized_card_images[card.get_image_index()], (l / 20, h / 20),
-                            (0.4 * l + (len(players[0].hand) - 1) * 0.1 * l, 0.6 * h))
+                            (0.4 * l + (len(players[0]['hand']) - 1) * 0.1 * l, 0.6 * h))
         hand_drawn.append(card)
         draw_sequence += 1
 
@@ -451,15 +460,18 @@ while running:
         process_player_action()
         if player_action == "fold":
             for i, opponent_position in enumerate(opponent_positions):
-                for card in players[i + 1].hand:
+                for card in players[i + 1]['hand']:
                     draw_card_animation(resized_card_images[card.get_image_index()], (l / 20, h / 20), opponent_position)
             winner, scores, winning_combination = play_round(players, table)
             print(f"Winner: {winner} with {winning_combination}")
             print("Scores:", scores)
             table.reset()
             for player in players:
-                player.reset_hand()
+                player['hand'] = []
             draw_sequence = 0
             player_action = None
+
+    # Sleep for a second before fetching the latest game state again
+    time.sleep(1)
 
 pygame.quit()
